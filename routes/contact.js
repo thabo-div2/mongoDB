@@ -68,21 +68,27 @@ router.put("/:id", auth, async (req, res) => {
 	if (type) contactFields.name = name;
 
 	try {
-		let contact = await Contact.findById(req.params.id);
+		let user = await User.findById(req.user.id);
+		if (user.role === "admin") {
+			let contact = await Contact.findById(req.params.id);
+			// Make sure user owns contact
+			if (!contact) return res.status(404).json({ msg: "Contact not found" });
+			if (contact.user.toString() !== req.user.id) {
+				return res.status(401).json({ msg: "Not authorized" });
+			}
 
-		if (!contact) return res.status(404).json({ msg: "Contact not found" });
+			contact = await Contact.findByIdAndUpdate(
+				req.params.id,
+				{
+					$set: contactFields,
+				},
+				{ new: true },
+			);
 
-		// Make sure user owns contact
-		if (contact.user.toString() !== req.user.id) {
-			return res.status(401).json({ msg: "Not authorized" });
+			res.json(contact);
+		} else {
+			res.send("You do not have admin privilege to edit");
 		}
-
-		contact = await Contact.findByIdAndUpdate(
-			req.params.id,
-			{ $set: contactFields },
-			{ new: true },
-		);
-		res.json(contact);
 	} catch (err) {
 		console.error(err.message);
 		res.status(500).json({ msg: "Server Error" });
